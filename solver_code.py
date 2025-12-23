@@ -1,16 +1,44 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import rcParams
+import numpy as np
+import os
 
 
 
+def save_fig_custom(fig, file_path='', file_name='fig', format_list=['.eps', '.png'], overwrite=False, dpi = 500):
+    
+    '''
+    Save the plotted graph as .esp and .png in high resolution.
+    '''
+
+    if (file_path != '') and (file_path[-1] != '/'): 
+        file_path = file_path+'/'
+    
+    if (file_path != '') and (os.path.isdir(file_path) == False):
+        os.makedirs(file_path)
+        print('Save directory %s is created'%(file_path))
+    
+    for save_format in format_list:
+        if save_format[0] != '.': save_format = '.' + save_format
+
+        file_name_now = file_path+file_name+save_format
+        if not overwrite:
+            i = 1
+            while os.path.exists(file_name_now):
+                file_name_now = file_path+file_name + '%i'%(i)+save_format
+                i = i+1
+        
+        if save_format == '.png':
+            fig.savefig(file_name_now, facecolor='white', bbox_inches="tight", dpi=dpi)
+        else:
+            fig.savefig(file_name_now, facecolor='white', bbox_inches="tight")
+
+        print(file_name_now, 'is saved.')
+    
+    return
 
 
-# Physical parameters setting
-L = 1.0             # domain length
-rho = 1.0           # fluid density
-Gamma = 0.1         # fluid diffusion coefficient
-phi_0 = 100.0       # left boundary value
-phi_L = 20.0        # right boundary value
 
 
 
@@ -47,16 +75,43 @@ def tdma(a_sub, a_diag, a_sup, d):
     return x
 
 
+def tdma(phi_0, phi_N, rho, u, gamma, L, number_of_grid):
+    
+    delta_x = L/(number_of_grid-1)      # first and last grid is half-cell, so full cell number is N-1
+    
+    # initialise the P, Q and phi lists
+    Q_list = np.zeros(number_of_grid)
+    P_list = np.zeros(number_of_grid)
+    phi_list = np.zeros(number_of_grid)
+    
+    
+    a = 2*gamma/delta_x
+    b = gamma/delta_x - rho*u/2
+    c = gamma/delta_x + rho*u/2
+    
+    Q_list[0] = phi_0
+    P_list[0] = 0
+    Q_list[number_of_grid-1] = phi_N
+    P_list[number_of_grid] = 0
+    phi_list[0] = phi_0
+    phi_list[number_of_grid-1] = phi_N
+
+    for i in range(1, number_of_grid-1):
+        P_list[i] = b / (a - c*P_list[i-1])
+        Q_list[i] = c*Q_list[i-1] / (a - c*P_list[i-1])
+
+    for i in reversed(range(1, number_of_grid-1)):
+        phi_list[i] = P_list[i]*phi_list[i+1] + Q_list[i]
+
+    return phi_list
+
+
+
+
+
+
 def analytical_phi(x, L, rho, u, Gamma, phi_0, phi_L):
     Pe = rho * u * L / Gamma  # Péclet number
-    
-    # if abs(u) < 1e-14:
-    #     # pure diffusion -> linear profile
-    #     return phi_0 + (phi_L - phi_0) * x / L
-    
-    # if abs(Pe) < 1e-6:
-    #     # limit Pe -> 0 also gives linear
-    #     return phi_0 + (phi_L - phi_0) * x / L
 
     phi = phi_0 + (((np.exp(rho*u*x/Gamma))-1)/((np.exp(rho*u*L/Gamma))-1)) *(phi_L - phi_0)
 
@@ -91,11 +146,11 @@ def solver(Nx, L, rho, u, Gamma, phi_0, phi_L, scheme):
         k = i - 1  # internal index 0..n_int-1
 
         # convection-diffusion coefficients at node i
-        if scheme == "CD":             # Central Differencing
+        if scheme == "CDS":             # Central Differencing
             a_W = D + 0.5 * F
             a_E = D - 0.5 * F
 
-        elif scheme == "UD":           # Upwind Differencing
+        elif scheme == "UDS":           # Upwind Differencing
             if F >= 0.0:
                 a_W = D + F
                 a_E = D
@@ -104,7 +159,7 @@ def solver(Nx, L, rho, u, Gamma, phi_0, phi_L, scheme):
                 a_W = D
                 a_E = D - F
 
-        elif scheme == "PL":           # Power-law Differencing (Patankar)
+        elif scheme == "PLDS":           # Power-law Differencing
             Pe = F / D
             phi_factor = max(0.0, (1.0 - 0.1 * abs(Pe)) ** 5)
             if F >= 0.0:
@@ -151,64 +206,3 @@ def solver(Nx, L, rho, u, Gamma, phi_0, phi_L, scheme):
 def mean_absolute_percentage_error(phi_num, phi_exact):
 
     return 100.0 * np.mean(np.abs((phi_num - phi_exact) / phi_exact))
-
-
-
-# if __name__ == "__main__":
-
-#     schemes = {
-#         "CD": "Central differencing",
-#         "UD": "Upwind differencing",
-#         "PL": "Power-law differencing",
-#     }
-
-    # # -------------------------------------------------
-    # # 1. Profiles for different velocities (fixed grid)
-    # # -------------------------------------------------
-    # Nx = Nx_for_profiles
-
-    # for scheme_id, scheme_name in schemes.items():
-    #     plt.figure()
-    #     for u in velocities:
-    #         x, phi_num = solver(
-    #             Nx, L, rho, u, Gamma, phi_0, phi_L, scheme_id
-    #         )
-    #         phi_exact = analytical_phi(x, L, rho, u, Gamma, phi_0, phi_L)
-    #         plt.plot(x, phi_num, marker="o", linestyle="-", label=f"u = {u} m/s (num)")
-    #         plt.plot(x, phi_exact, linestyle="--", label=f"u = {u} m/s (analytic)")
-
-    #     plt.xlabel("x [m]")
-    #     plt.ylabel(r"$\phi$")
-    #     plt.title(f"Convection–diffusion profiles ({scheme_name}), Nx = {Nx}")
-    #     plt.legend()
-    #     plt.grid(True)
-    #     plt.tight_layout()
-
-    # # -------------------------------------------------
-    # # 2. Error vs grid spacing for each scheme (fixed u)
-    # # -------------------------------------------------
-    # plt.figure()
-    # for scheme_id, scheme_name in schemes.items():
-    #     dx_list = []
-    #     err_list = []
-    #     for Nx in Nx_list_error:
-    #         x, phi_num = solver(
-    #             Nx, L, rho, u_for_error_plot, Gamma, phi_0, phi_L, scheme_id
-    #         )
-    #         phi_exact = analytical_phi(x, L, rho, u_for_error_plot, Gamma, phi_0, phi_L)
-    #         # use internal nodes only in the error, consistent with discretisation
-    #         err = mean_absolute_percentage_error(phi_num[1:-1], phi_exact[1:-1])
-    #         dx = L / (Nx - 1)
-    #         dx_list.append(dx)
-    #         err_list.append(err)
-
-    #     plt.loglog(dx_list, err_list, marker="o", linestyle="-", label=scheme_name)
-
-    # plt.xlabel(r"Grid spacing $\Delta x$ [m]")
-    # plt.ylabel("Mean absolute percentage error [%]")
-    # plt.title(f"Error vs grid spacing, u = {u_for_error_plot} m/s")
-    # plt.legend()
-    # plt.grid(True, which="both")
-    # plt.tight_layout()
-
-    # plt.show()
