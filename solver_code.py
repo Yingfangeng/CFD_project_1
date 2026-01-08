@@ -53,19 +53,19 @@ class convection_diffusion_equation:
 
         for i in range(1, self.number_of_grid-1):
             if self.scheme == "CDS":
-                b = self.gamma/self.delta_x - self.rho*self.u/2
-                c = self.gamma/self.delta_x + self.rho*self.u/2
+                b = self.gamma/self.delta_x - self.rho*self.u/2 # aE
+                c = self.gamma/self.delta_x + self.rho*self.u/2 # aW
                 a = b + c
 
             elif self.scheme == "UDS":
-                b = self.gamma/self.delta_x + max(-(self.rho*self.u), 0)
-                c = self.gamma/self.delta_x + max(self.rho*self.u, 0)
+                b = self.gamma/self.delta_x + max(-(self.rho*self.u), 0) # aE
+                c = self.gamma/self.delta_x + max(self.rho*self.u, 0) # aW
                 a = b + c
 
             elif self.scheme == "PLDS":
             
-                b = self.gamma/self.delta_x * max(0, (1 - 0.1 * abs(self.Pe_local)) ** 5) + max(-(self.rho*self.u), 0)
-                c = self.gamma/self.delta_x * max(0, (1 - 0.1 * abs(self.Pe_local)) ** 5) + max(self.rho*self.u, 0)
+                b = self.gamma/self.delta_x * max(0, (1 - 0.1 * abs(self.Pe_local)) ** 5) + max(-(self.rho*self.u), 0) # aE
+                c = self.gamma/self.delta_x * max(0, (1 - 0.1 * abs(self.Pe_local)) ** 5) + max(self.rho*self.u, 0) # aW
                 a = b + c
 
             else:
